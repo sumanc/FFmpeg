@@ -20,6 +20,7 @@
 
 #include <stdint.h>
 #include <string.h>
+#include <time.h>
 
 #include "config.h"
 
@@ -44,6 +45,12 @@
 #include "hwaccel.h"
 #include "internal.h"
 #include "thread.h"
+
+static int64_t current_time() {
+    struct timespec time;
+    clock_gettime(CLOCK_REALTIME, &time);
+    return (int64_t)time.tv_sec * 1000000L + (uint64_t)(time.tv_nsec / 1000);
+}
 
 static int apply_param_change(AVCodecContext *avctx, const AVPacket *avpkt)
 {
@@ -453,10 +460,14 @@ static int decode_simple_internal(AVCodecContext *avctx, AVFrame *frame)
     if (avctx->codec->type == AVMEDIA_TYPE_VIDEO) {
         if (frame->flags & AV_FRAME_FLAG_DISCARD)
             got_frame = 0;
-        if (got_frame)
+        if (got_frame) {
+            frame->pkt_dts = current_time();
+            frame->pts = current_time();
             frame->best_effort_timestamp = guess_correct_pts(avctx,
                                                              frame->pts,
                                                              frame->pkt_dts);
+
+        }
     } else if (avctx->codec->type == AVMEDIA_TYPE_AUDIO) {
         uint8_t *side;
         int side_size;
